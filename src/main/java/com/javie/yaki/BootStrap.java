@@ -21,5 +21,7 @@ public class BootStrap extends SpringBootServletInitializer{
         new BootStrap()
                 .configure(new SpringApplicationBuilder(BootStrap.class))
                 .run(args);
+
+
     }
 }
