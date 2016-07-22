@@ -12,25 +12,25 @@ import org.springframework.stereotype.Component;
 public class TestResource {
 
     @GET
-    @RateLimited
+    @RateLimited(cost = 10, key = "test")
     public String hello() {
         return "hello world!";
     }
 
-//    @POST
-//    @Path("redis")
-//    public Response save(@QueryParam("key") String key, @QueryParam("value") String value) {
-//        ValueOperations<String, String> ops = redisTemplate.opsForValue();
-//        ops.set(key, value);
-//        return Response.ok().build();
-//    }
-//
-//    @GET
-//    @RateLimited
-//    @Path("redis/{key}")
-//    public String get(@PathParam("key") String key) {
-//        ValueOperations<String, String> ops = redisTemplate.opsForValue();
-//        return ops.get(key);
-//    }
+    //    @POST
+    //    @Path("redis")
+    //    public Response save(@QueryParam("key") String key, @QueryParam("value") String value) {
+    //        ValueOperations<String, String> ops = redisTemplate.opsForValue();
+    //        ops.set(key, value);
+    //        return Response.ok().build();
+    //    }
+    //
+    //    @GET
+    //    @RateLimited
+    //    @Path("redis/{key}")
+    //    public String get(@PathParam("key") String key) {
+    //        ValueOperations<String, String> ops = redisTemplate.opsForValue();
+    //        return ops.get(key);
+    //    }
 
 }

@@ -10,4 +10,7 @@ import javax.ws.rs.NameBinding;
 @NameBinding
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD})
-public @interface RateLimited { }
+public @interface RateLimited {
+    int cost() default 1;
+    String key() default "global";
+}

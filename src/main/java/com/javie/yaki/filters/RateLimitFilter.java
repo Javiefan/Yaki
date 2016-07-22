@@ -2,38 +2,35 @@ package com.javie.yaki.filters;
 
 import java.io.IOException;
 
-import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
+import javax.ws.rs.container.ResourceInfo;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.ext.Provider;
 
 import com.javie.yaki.annotation.RateLimited;
+import com.javie.yaki.properties.RateLimitProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Transaction;
 
 /**
  * Created by Javie on 16/6/17.
  */
+
 @RateLimited
+@Provider
 public class RateLimitFilter implements ContainerRequestFilter {
     private static final Logger LOGGER = LoggerFactory.getLogger(RateLimitFilter.class);
 
-    //    @Autowired
-    //    private StringRedisTemplate redisTemplate;
-
     @Context
-    private HttpServletRequest requestContext;
+    private ResourceInfo info;
 
-    private static final String RATE_LIMIT = "counter:available";
-    private static final String TIME_STAMP = "counter:ts";
-
-    private static final int TIME_OUT = 10;
-    private static final float RATE = 1;
-    private static final float BUCKET = 100;
-    private static final float TOKENS = 5;
+    @Autowired
+    private RateLimitProperties rateLimitProperties;
 
     @Override
     public void filter(ContainerRequestContext containerRequestContext) throws IOException {
@@ -46,61 +43,44 @@ public class RateLimitFilter implements ContainerRequestFilter {
 
 
     private boolean isOverRateLimit() {
+        RateLimited rateLimited = info.getResourceMethod().getAnnotation(RateLimited.class);
+        float costTokens = rateLimited.cost();
+        String tokenKey = rateLimited.key().concat(":available");
+        String timeKey = rateLimited.key().concat(":ts");
+        int timeout = rateLimitProperties.getTimeout();
+        float rate = rateLimitProperties.getRate();
+        float bucket = rateLimitProperties.getBucket();
+
         Jedis jedis = new Jedis("localhost");
         long currentTime = System.currentTimeMillis();
-        String oldTokens = jedis.get(RATE_LIMIT);
+        String oldTokens = jedis.get(tokenKey);
         long oldTime;
         float currentTokens;
         LOGGER.info("=================== sCounter : " + oldTokens);
         if (oldTokens == null) {
-            currentTokens = BUCKET;
+            currentTokens = bucket;
         } else {
-            oldTime = Long.parseLong(jedis.get(TIME_STAMP));
+            oldTime = Long.parseLong(jedis.get(timeKey));
             LOGGER.info("++++++++++++++ time : " + (currentTime - oldTime) / 1000.0);
-            currentTokens = Float.parseFloat(oldTokens) + Math.min((currentTime - oldTime) * RATE / 1000,
-                                                                   BUCKET - Float.parseFloat(oldTokens));
+            currentTokens = Float.parseFloat(oldTokens) + Math.min((currentTime - oldTime) * rate / 1000,
+                                                                   bucket - Float.parseFloat(oldTokens));
         }
 
         boolean isOverRateLimit;
-        if (TOKENS <= currentTokens) {
-            currentTokens -= TOKENS;
+        if (costTokens <= currentTokens) {
+            currentTokens -= costTokens;
             isOverRateLimit = false;
         } else {
             isOverRateLimit = true;
         }
 
         Transaction transaction = jedis.multi();
-        transaction.set(RATE_LIMIT, currentTokens + "");
-        transaction.expire(RATE_LIMIT, TIME_OUT);
-        transaction.set(TIME_STAMP, currentTime + "");
-        transaction.expire(TIME_STAMP, TIME_OUT);
+        transaction.set(tokenKey, currentTokens + "");
+        transaction.expire(tokenKey, timeout);
+        transaction.set(timeKey, currentTime + "");
+        transaction.expire(timeKey, timeout);
         transaction.exec();
 
         return isOverRateLimit;
     }
-    //    private boolean isOverRateLimit() {
-    //        LOGGER.info("filter works!!!!!!");
-    //        LOGGER.info("user: " + requestContext.getRemoteUser());
-    //        LOGGER.info("ip: " + requestContext.getRemoteAddr());
-    //
-    //        PathMatchingResourcePatternResolver resourcePatternResolver = new PathMatchingResourcePatternResolver();
-    //        Resource resource = resourcePatternResolver.getResource("classpath:SlidingWindowRateLimit.lua");
-    ////        Resource resource = resourcePatternResolver.getResource("classpath:PythonRateLimit.py");
-    //        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
-    //        script.setLocation(resource);
-    //        script.setResultType(Long.class);
-    //
-    //        ArrayList<String> keys = new ArrayList<>();
-    //        keys.add(requestContext.getRemoteAddr());
-    //        String[] params = new String[3];
-    //        params[0] = "[[1, 10], [3, 200], [36, 3000]]";
-    //        Long unixTime = System.currentTimeMillis() / 1000L;
-    //        params[1] = (unixTime.toString());
-    //        params[2] = "1";
-    //
-    //
-    //        long result = redisTemplate.execute(script, keys, params);
-    //
-    //        return result != 0;
-    //    }
 }
